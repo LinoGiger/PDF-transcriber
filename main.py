@@ -107,47 +107,54 @@ def parse_page_selection(page_selection: str, total_pages: int) -> list[int]:
     return pages
 
 def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3, page_numbers: list[int] | None = None) -> None:
-    """Main processing function. If page_numbers is provided, only process those pages."""
+    """Main processing function. If page_numbers is provided, only process those pages. Saves progress after each chunk."""
     doc = fitz.open(pdf_path)
     total_pages = len(doc)
     doc.close()
 
-    translated_texts = []
+    translated_texts: list[str] = []
+    chunk_separator = "\n\n--- Chunk Separator ---\n\n"
 
-    if page_numbers:
-        # Process only specified pages, in chunks
-        page_numbers = sorted(set(p for p in page_numbers if 1 <= p <= total_pages))
-        print("page_numbers", page_numbers)
-        for i in range(0, len(page_numbers), chunk_size):
-            chunk = page_numbers[i:i+chunk_size]
-            print(f"Processing pages {chunk[0]} to {chunk[-1]}...")
-            images = render_pages_to_images(pdf_path, chunk)
-            print("rendered images", len(images))
-            extracted_text = extract_text_from_images(images)
-            print("extracted text", extracted_text)
-            translated = translate_text(extracted_text)
-            print("translated text", translated)
-            translated_texts.append(translated)
-    else:
-        # Process all pages in chunks as before
-        for start in range(0, total_pages, chunk_size):
-            end = min(start + chunk_size, total_pages)
-            chunk = list(range(start + 1, end + 1))
-            print(f"Processing pages {chunk[0]} to {chunk[-1]}...")
-            images = render_pages_to_images(pdf_path, chunk)
-            print("rendered images", len(images))
-            extracted_text = extract_text_from_images(images)
-            print("extracted text", extracted_text)
-            translated = translate_text(extracted_text)
-            print("translated text", translated)
-            translated_texts.append(translated)
-            break
+    def save_progress():
+        if translated_texts:
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(chunk_separator.join(translated_texts))
 
-    # Save to file
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\n\n--- Chunk Separator ---\n\n".join(translated_texts))
-
-    print(f"Processing complete. Output saved to {output_path}")
+    try:
+        if page_numbers:
+            # Process only specified pages, in chunks
+            page_numbers = sorted(set(p for p in page_numbers if 1 <= p <= total_pages))
+            print("page_numbers", page_numbers)
+            for i in range(0, len(page_numbers), chunk_size):
+                chunk = page_numbers[i:i+chunk_size]
+                print(f"Processing pages {chunk[0]} to {chunk[-1]}...")
+                images = render_pages_to_images(pdf_path, chunk)
+                print("rendered images", len(images))
+                extracted_text = extract_text_from_images(images)
+                print("extracted text", extracted_text)
+                translated = translate_text(extracted_text)
+                print("translated text", translated)
+                translated_texts.append(translated)
+                save_progress()
+        else:
+            # Process all pages in chunks as before
+            for start in range(0, total_pages, chunk_size):
+                end = min(start + chunk_size, total_pages)
+                chunk = list(range(start + 1, end + 1))
+                print(f"Processing pages {chunk[0]} to {chunk[-1]}...")
+                images = render_pages_to_images(pdf_path, chunk)
+                print("rendered images", len(images))
+                extracted_text = extract_text_from_images(images)
+                print("extracted text", extracted_text)
+                translated = translate_text(extracted_text)
+                print("translated text", translated)
+                translated_texts.append(translated)
+                save_progress()
+        print(f"Processing complete. Output saved to {output_path}")
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        save_progress()
+        raise
 
 if __name__ == "__main__":
     import sys
