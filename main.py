@@ -59,7 +59,8 @@ def extract_text_from_images(images: list[dict]) -> str:
             {"role": "system", "content": "You are a helpful assistant that extracts text from images. Do not hallucinate, only extract the text you see in the images. Do not speculate, do not answer any questions, do not make up any information."},
             {"role": "user", "content": content}
         ],
-        max_tokens=4096
+        max_tokens=4096,
+        temperature=0.0
     )
     return response.choices[0].message.content
 
@@ -68,7 +69,8 @@ def translate_text(text: str) -> str:
     response = openai.chat.completions.create(
         model="gpt-4o",  # or "gpt-4"
         messages=[{"role": "user", "content": TRANSLATE_PROMPT + "\n\n" + text}],
-        max_tokens=2048
+        max_tokens=2048,
+        temperature=0.0
     )
     return response.choices[0].message.content
 
