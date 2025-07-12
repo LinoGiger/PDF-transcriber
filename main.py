@@ -89,43 +89,85 @@ def translate_text(text: str) -> str:
     )
     return response.choices[0].message.content
 
-def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3) -> None:
-    """Main processing function."""
+def parse_page_selection(page_selection: str, total_pages: int) -> list[int]:
+    """Parse a page selection string like '1,2,5-7' into a list of page numbers (1-based)."""
+    pages: list[int] = []
+    if not page_selection.strip():
+        return pages
+    for part in page_selection.split(","):
+        part = part.strip()
+        if "-" in part:
+            start, end = part.split("-")
+            start, end = int(start), int(end)
+            pages.extend(range(start, end + 1))
+        else:
+            pages.append(int(part))
+    # Remove duplicates and out-of-bounds
+    pages = sorted(set(p for p in pages if 1 <= p <= total_pages))
+    return pages
+
+def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3, page_numbers: list[int] | None = None) -> None:
+    """Main processing function. If page_numbers is provided, only process those pages."""
     doc = fitz.open(pdf_path)
     total_pages = len(doc)
     doc.close()
 
     translated_texts = []
 
-    for start in range(0, total_pages, chunk_size):
-        end = min(start + chunk_size, total_pages)
-        page_numbers = list(range(start + 1, end + 1))
-        print(f"Processing pages {page_numbers[0]} to {page_numbers[-1]}...")
-
-        images = render_pages_to_images(pdf_path, page_numbers)
-        print("rendered images", len(images))
-        for i, img in enumerate(images):
-            temp_file = save_image_to_local_file(img, f"test_{i}")
-            print(f"Saved image to {temp_file}")
-        extracted_text = extract_text_from_images(images)
-        print("extracted text", extracted_text)
-        translated = translate_text(extracted_text)
-        print("translated text", translated)
-        translated_texts.append(translated)
-        break
+    if page_numbers:
+        # Process only specified pages, in chunks
+        page_numbers = sorted(set(p for p in page_numbers if 1 <= p <= total_pages))
+        print("page_numbers", page_numbers)
+        for i in range(0, len(page_numbers), chunk_size):
+            chunk = page_numbers[i:i+chunk_size]
+            print(f"Processing pages {chunk[0]} to {chunk[-1]}...")
+            images = render_pages_to_images(pdf_path, chunk)
+            print("rendered images", len(images))
+            extracted_text = extract_text_from_images(images)
+            print("extracted text", extracted_text)
+            translated = translate_text(extracted_text)
+            print("translated text", translated)
+            translated_texts.append(translated)
+    else:
+        # Process all pages in chunks as before
+        for start in range(0, total_pages, chunk_size):
+            end = min(start + chunk_size, total_pages)
+            chunk = list(range(start + 1, end + 1))
+            print(f"Processing pages {chunk[0]} to {chunk[-1]}...")
+            images = render_pages_to_images(pdf_path, chunk)
+            print("rendered images", len(images))
+            extracted_text = extract_text_from_images(images)
+            print("extracted text", extracted_text)
+            translated = translate_text(extracted_text)
+            print("translated text", translated)
+            translated_texts.append(translated)
+            break
 
     # Save to file
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\\n\n--- Chunk Separator ---\n\n".join(translated_texts))
+        f.write("\n\n--- Chunk Separator ---\n\n".join(translated_texts))
 
     print(f"Processing complete. Output saved to {output_path}")
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) != 3:
-        print("Usage: python main.py <input_pdf> <output_txt>")
+    def print_usage():
+        print("Usage: python main.py <input_pdf> <output_txt> [pages]")
+        print("  [pages] is optional, e.g. '1,2,5-7' (no spaces)")
+    if len(sys.argv) not in (3, 4):
+        print_usage()
         sys.exit(1)
 
     pdf_path = sys.argv[1]
     output_path = sys.argv[2]
-    process_pdf(pdf_path, output_path)
+    page_numbers = None
+    if len(sys.argv) == 4:
+        # Get total pages for bounds checking
+        doc = fitz.open(pdf_path)
+        total_pages = len(doc)
+        doc.close()
+        page_numbers = parse_page_selection(sys.argv[3], total_pages)
+        if not page_numbers:
+            print("No valid pages selected.")
+            sys.exit(1)
+    process_pdf(pdf_path, output_path, page_numbers=page_numbers)
