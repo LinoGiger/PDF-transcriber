@@ -22,13 +22,20 @@ with open("extract_prompt.txt", "r", encoding="utf-8") as f:
 with open("translate_prompt.txt", "r", encoding="utf-8") as f:
     TRANSLATE_PROMPT = f.read().strip()
 
-def render_pages_to_images(pdf_path: str, page_numbers: List[int]) -> List[dict]:
+def render_pages_to_images(pdf_path: str, page_numbers: list[int]) -> list[dict]:
     """Render specified PDF pages to PNG images and encode to base64."""
     doc = fitz.open(pdf_path)
     images = []
     for page_num in page_numbers:
         page = doc.load_page(page_num - 1)  # 0-based
-        pix = page.get_pixmap()
+        
+        # Create a transformation matrix for higher resolution
+        # Scale factor of 2.0 doubles the resolution (4x more pixels)
+        # You can adjust this value: 1.5, 2.0, 3.0, etc.
+        mat = fitz.Matrix(2.0, 2.0)
+        
+        # Get pixmap with higher resolution and better color space
+        pix = page.get_pixmap(matrix=mat, alpha=False)
         img_bytes = pix.tobytes("png")
         base64_img = base64.b64encode(img_bytes).decode("utf-8")
         images.append({
@@ -38,6 +45,14 @@ def render_pages_to_images(pdf_path: str, page_numbers: List[int]) -> List[dict]
         })
     doc.close()
     return images
+
+def save_image_to_local_file(image: dict, name: str) -> str:
+    """Save a base64-encoded image dict to the current directory as a PNG file and return the file path."""
+    img_data = base64.b64decode(image["data"])
+    file_path = f"temp/{name}.png"
+    with open(file_path, "wb") as file:
+        file.write(img_data)
+    return file_path
 
 def extract_text_from_images(images: list[dict]) -> str:
     """Send images to GPT-4 Vision to extract text."""
@@ -88,7 +103,10 @@ def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3) -> None:
         print(f"Processing pages {page_numbers[0]} to {page_numbers[-1]}...")
 
         images = render_pages_to_images(pdf_path, page_numbers)
-        print("rendered images")
+        print("rendered images", len(images))
+        for i, img in enumerate(images):
+            temp_file = save_image_to_local_file(img, f"test_{i}")
+            print(f"Saved image to {temp_file}")
         extracted_text = extract_text_from_images(images)
         print("extracted text", extracted_text)
         translated = translate_text(extracted_text)
@@ -98,7 +116,7 @@ def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3) -> None:
 
     # Save to file
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\n\n--- Chunk Separator ---\n\n".join(translated_texts))
+        f.write("\\n\n--- Chunk Separator ---\n\n".join(translated_texts))
 
     print(f"Processing complete. Output saved to {output_path}")
 
