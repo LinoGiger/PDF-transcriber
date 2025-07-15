@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import threading
-import sys
 import os
 from main import process_pdf
 
@@ -45,7 +44,14 @@ class PDFTranscriberGUI:
             self.input_entry.insert(0, path)
 
     def browse_output(self) -> None:
-        path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+        default_dir = os.path.join(os.getcwd(), "extracted_pdfs")
+        os.makedirs(default_dir, exist_ok=True)
+        
+        path = filedialog.asksaveasfilename(
+            defaultextension=".txt", 
+            filetypes=[("Text files", "*.txt")],
+            initialdir=default_dir
+        )
         if path:
             self.output_entry.delete(0, tk.END)
             self.output_entry.insert(0, path)
