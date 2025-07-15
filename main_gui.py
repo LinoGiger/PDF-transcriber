@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import threading
+import sys
 import os
 from main import process_pdf
 
@@ -44,6 +45,7 @@ class PDFTranscriberGUI:
             self.input_entry.insert(0, path)
 
     def browse_output(self) -> None:
+        # Create extracted_pdfs directory if it doesn't exist
         default_dir = os.path.join(os.getcwd(), "extracted_pdfs")
         os.makedirs(default_dir, exist_ok=True)
         
@@ -60,9 +62,16 @@ class PDFTranscriberGUI:
         input_path = self.input_entry.get().strip()
         output_path = self.output_entry.get().strip()
         page_selection = self.pages_entry.get().strip()
+        
         if not input_path or not output_path:
             messagebox.showerror("Error", "Please select both input and output files.")
             return
+            
+        # Ensure output path has .txt extension and is in extracted_pdfs folder
+        output_path = self._normalize_output_path(output_path)
+        self.output_entry.delete(0, tk.END)
+        self.output_entry.insert(0, output_path)
+        
         # Validate page selection
         page_numbers = None
         if page_selection:
@@ -82,6 +91,22 @@ class PDFTranscriberGUI:
         self.go_button.config(state="disabled")
         threading.Thread(target=self._process_pdf_thread, args=(input_path, output_path, page_numbers), daemon=True).start()
 
+    def _normalize_output_path(self, output_path: str) -> str:
+        """Ensure output path has .txt extension and is in extracted_pdfs folder."""
+        # Create extracted_pdfs folder if it doesn't exist
+        extracted_dir = os.path.join(os.getcwd(), "extracted_pdfs")
+        os.makedirs(extracted_dir, exist_ok=True)
+        
+        # Get just the filename from the path
+        filename = os.path.basename(output_path)
+        
+        # Ensure .txt extension
+        if not filename.lower().endswith('.txt'):
+            filename += '.txt'
+        
+        # Return the full path in extracted_pdfs folder
+        return os.path.join(extracted_dir, filename)
+
     def _process_pdf_thread(self, input_path: str, output_path: str, page_numbers: list[int] | None) -> None:
         try:
             process_pdf(input_path, output_path, page_numbers=page_numbers)
@@ -100,6 +125,7 @@ class PDFTranscriberGUI:
         self.status_text.config(state="disabled")
 
 def main() -> None:
+    print("Starting GUI...")
     root = tk.Tk()
     app = PDFTranscriberGUI(root)
     root.mainloop()

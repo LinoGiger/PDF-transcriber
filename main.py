@@ -106,6 +106,22 @@ def parse_page_selection(page_selection: str, total_pages: int) -> list[int]:
     pages = sorted(set(p for p in pages if 1 <= p <= total_pages))
     return pages
 
+def normalize_output_path(output_path: str) -> str:
+    """Ensure output path has .txt extension and is in extracted_pdfs folder."""
+    # Create extracted_pdfs folder if it doesn't exist
+    extracted_dir = os.path.join(os.getcwd(), "extracted_pdfs")
+    os.makedirs(extracted_dir, exist_ok=True)
+    
+    # Get just the filename from the path
+    filename = os.path.basename(output_path)
+    
+    # Ensure .txt extension
+    if not filename.lower().endswith('.txt'):
+        filename += '.txt'
+    
+    # Return the full path in extracted_pdfs folder
+    return os.path.join(extracted_dir, filename)
+
 def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3, page_numbers: list[int] | None = None) -> None:
     """Main processing function. If page_numbers is provided, only process those pages. Saves progress after each chunk."""
     doc = fitz.open(pdf_path)
@@ -167,6 +183,12 @@ if __name__ == "__main__":
 
     pdf_path = sys.argv[1]
     output_path = sys.argv[2]
+    print("pdf_path", pdf_path)
+    
+    # Normalize output path to ensure .txt extension and extracted_pdfs folder
+    output_path = normalize_output_path(output_path)
+    print("normalized output_path", output_path)
+    
     page_numbers = None
     if len(sys.argv) == 4:
         # Get total pages for bounds checking
