@@ -126,12 +126,11 @@ def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3, page_numbe
     doc.close()
 
     extracted_texts: list[str] = []
-    chunk_separator = "\n\n--- Chunk Separator ---\n\n"
 
     def save_progress():
         if extracted_texts:
             with open(output_path, "w", encoding="utf-8") as f:
-                f.write(chunk_separator.join(extracted_texts))
+                f.write("\n".join(extracted_texts))
 
     try:
         if page_numbers:
