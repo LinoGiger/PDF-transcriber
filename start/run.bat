@@ -1,5 +1,6 @@
 @echo off
 cd /d "%~dp0"
+cd ..
 call .venv\Scripts\activate
-python main_gui.py
+python src\main_gui.py
 pause

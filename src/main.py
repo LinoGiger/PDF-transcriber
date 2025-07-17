@@ -16,10 +16,10 @@ VISION_MODEL = "gpt-4o"  # or "gpt-4-vision-preview"
 
 # Model to use
 MODEL = "claude-sonnet-4-20250514"  # Load prompts
-with open("extract_prompt.txt", "r", encoding="utf-8") as f:
+with open("src/extract_prompt.txt", "r", encoding="utf-8") as f:
     EXTRACT_PROMPT = f.read().strip()
 
-with open("translate_prompt.txt", "r", encoding="utf-8") as f:
+with open("src/translate_prompt.txt", "r", encoding="utf-8") as f:
     TRANSLATE_PROMPT = f.read().strip()
 
 def render_pages_to_images(pdf_path: str, page_numbers: list[int]) -> list[dict]:

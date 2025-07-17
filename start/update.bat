@@ -1,5 +1,6 @@
 @echo off
 cd /d "%~dp0"
+cd ..
 echo Updating repository to latest main branch...
 echo This will discard any local changes!
 echo.
