@@ -32,11 +32,38 @@ class PDFTranscriberGUI:
         self.pages_entry = tk.Entry(root, width=40)
         self.pages_entry.grid(row=2, column=1, padx=5, pady=5)
 
+        # Add language selection
+        self.language_label = tk.Label(root, text="Language:")
+        self.language_label.grid(row=3, column=0, padx=5, pady=5, sticky="e")
+        
+        # Create a frame for radio buttons
+        self.language_frame = tk.Frame(root)
+        self.language_frame.grid(row=3, column=1, padx=5, pady=5, sticky="w")
+        
+        # Language selection variable (default to Russian)
+        self.language_var = tk.StringVar(value="russian")
+        
+        self.russian_radio = tk.Radiobutton(
+            self.language_frame, 
+            text="Russian", 
+            variable=self.language_var, 
+            value="russian"
+        )
+        self.russian_radio.pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.english_radio = tk.Radiobutton(
+            self.language_frame, 
+            text="English", 
+            variable=self.language_var, 
+            value="english"
+        )
+        self.english_radio.pack(side=tk.LEFT)
+
         self.go_button = tk.Button(root, text="Go", command=self.run_process)
-        self.go_button.grid(row=3, column=1, pady=10)
+        self.go_button.grid(row=4, column=1, pady=10)
 
         self.status_text = tk.Text(root, height=8, width=60, state="disabled")
-        self.status_text.grid(row=4, column=0, columnspan=3, padx=5, pady=5)
+        self.status_text.grid(row=5, column=0, columnspan=3, padx=5, pady=5)
 
     def browse_input(self) -> None:
         path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
@@ -62,6 +89,7 @@ class PDFTranscriberGUI:
         input_path = self.input_entry.get().strip()
         output_path = self.output_entry.get().strip()
         page_selection = self.pages_entry.get().strip()
+        language = self.language_var.get()
         
         if not input_path or not output_path:
             messagebox.showerror("Error", "Please select both input and output files.")
@@ -87,9 +115,11 @@ class PDFTranscriberGUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Invalid page selection: {e}")
                 return
+        
         self.append_status(f"Processing: {input_path} -> {output_path}\n")
+        self.append_status(f"Language: {language.capitalize()}\n")
         self.go_button.config(state="disabled")
-        threading.Thread(target=self._process_pdf_thread, args=(input_path, output_path, page_numbers), daemon=True).start()
+        threading.Thread(target=self._process_pdf_thread, args=(input_path, output_path, page_numbers, language), daemon=True).start()
 
     def _normalize_output_path(self, output_path: str) -> str:
         """Ensure output path has .txt extension and is in extracted_pdfs folder."""
@@ -107,9 +137,9 @@ class PDFTranscriberGUI:
         # Return the full path in extracted_pdfs folder
         return os.path.join(extracted_dir, filename)
 
-    def _process_pdf_thread(self, input_path: str, output_path: str, page_numbers: list[int] | None) -> None:
+    def _process_pdf_thread(self, input_path: str, output_path: str, page_numbers: list[int] | None, language: str) -> None:
         try:
-            process_pdf(input_path, output_path, page_numbers=page_numbers)
+            process_pdf(input_path, output_path, page_numbers=page_numbers, language=language)
             self.append_status("Done!\n")
             messagebox.showinfo("Success", f"Processing complete. Output saved to {output_path}")
         except Exception as e:

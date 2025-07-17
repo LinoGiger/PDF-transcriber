@@ -16,11 +16,11 @@ VISION_MODEL = "gpt-4o"  # or "gpt-4-vision-preview"
 
 # Model to use
 MODEL = "claude-sonnet-4-20250514"  # Load prompts
-with open("src/extract_prompt.txt", "r", encoding="utf-8") as f:
-    EXTRACT_PROMPT = f.read().strip()
+with open("src/extract_prompt_russian.txt", "r", encoding="utf-8") as f:
+    EXTRACT_PROMPT_RUSSIAN = f.read().strip()
 
-with open("src/translate_prompt.txt", "r", encoding="utf-8") as f:
-    TRANSLATE_PROMPT = f.read().strip()
+with open("src/extract_prompt_english.txt", "r", encoding="utf-8") as f:
+    EXTRACT_PROMPT_ENGLISH = f.read().strip()
 
 def render_pages_to_images(pdf_path: str, page_numbers: list[int]) -> list[dict]:
     """Render specified PDF pages to PNG images and encode to base64."""
@@ -54,11 +54,17 @@ def save_image_to_local_file(image: dict, name: str) -> str:
         file.write(img_data)
     return file_path
 
-def extract_text_from_images(images: list[dict]) -> str:
+def extract_text_from_images(images: list[dict], language: str = "russian") -> str:
     """Send images to GPT-4 Vision to extract text."""
+    # Choose the appropriate prompt based on language
+    if language.lower() == "english":
+        prompt = EXTRACT_PROMPT_ENGLISH
+    else:
+        prompt = EXTRACT_PROMPT_RUSSIAN
+    
     # OpenAI expects images as base64-encoded strings in the content
     content = [
-        {"type": "text", "text": EXTRACT_PROMPT}
+        {"type": "text", "text": prompt}
     ]
     for img in images:
         content.append({
@@ -75,16 +81,6 @@ def extract_text_from_images(images: list[dict]) -> str:
             {"role": "user", "content": content}
         ],
         max_tokens=4096,
-        temperature=0.0
-    )
-    return response.choices[0].message.content
-
-def translate_text(text: str) -> str:
-    """Send extracted text to GPT-4 for translation to English."""
-    response = openai.chat.completions.create(
-        model="gpt-4o",  # or "gpt-4"
-        messages=[{"role": "user", "content": TRANSLATE_PROMPT + "\n\n" + text}],
-        max_tokens=2048,
         temperature=0.0
     )
     return response.choices[0].message.content
@@ -122,19 +118,20 @@ def normalize_output_path(output_path: str) -> str:
     # Return the full path in extracted_pdfs folder
     return os.path.join(extracted_dir, filename)
 
-def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3, page_numbers: list[int] | None = None) -> None:
+def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3, page_numbers: list[int] | None = None, language: str = "russian") -> None:
     """Main processing function. If page_numbers is provided, only process those pages. Saves progress after each chunk."""
+    print("language", language)
     doc = fitz.open(pdf_path)
     total_pages = len(doc)
     doc.close()
 
-    translated_texts: list[str] = []
+    extracted_texts: list[str] = []
     chunk_separator = "\n\n--- Chunk Separator ---\n\n"
 
     def save_progress():
-        if translated_texts:
+        if extracted_texts:
             with open(output_path, "w", encoding="utf-8") as f:
-                f.write(chunk_separator.join(translated_texts))
+                f.write(chunk_separator.join(extracted_texts))
 
     try:
         if page_numbers:
@@ -146,11 +143,9 @@ def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3, page_numbe
                 print(f"Processing pages {chunk[0]} to {chunk[-1]}...")
                 images = render_pages_to_images(pdf_path, chunk)
                 print("rendered images", len(images))
-                extracted_text = extract_text_from_images(images)
+                extracted_text = extract_text_from_images(images, language)
                 print("extracted text", extracted_text)
-                translated = translate_text(extracted_text)
-                print("translated text", translated)
-                translated_texts.append(translated)
+                extracted_texts.append(extracted_text)
                 save_progress()
         else:
             # Process all pages in chunks as before
@@ -160,11 +155,9 @@ def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3, page_numbe
                 print(f"Processing pages {chunk[0]} to {chunk[-1]}...")
                 images = render_pages_to_images(pdf_path, chunk)
                 print("rendered images", len(images))
-                extracted_text = extract_text_from_images(images)
+                extracted_text = extract_text_from_images(images, language)
                 print("extracted text", extracted_text)
-                translated = translate_text(extracted_text)
-                print("translated text", translated)
-                translated_texts.append(translated)
+                extracted_texts.append(extracted_text)
                 save_progress()
         print(f"Processing complete. Output saved to {output_path}")
     except Exception as e:
@@ -175,9 +168,10 @@ def process_pdf(pdf_path: str, output_path: str, chunk_size: int = 3, page_numbe
 if __name__ == "__main__":
     import sys
     def print_usage():
-        print("Usage: python main.py <input_pdf> <output_txt> [pages]")
+        print("Usage: python main.py <input_pdf> <output_txt> [pages] [language]")
         print("  [pages] is optional, e.g. '1,2,5-7' (no spaces)")
-    if len(sys.argv) not in (3, 4):
+        print("  [language] is optional, 'russian' or 'english' (default: russian)")
+    if len(sys.argv) not in (3, 4, 5):
         print_usage()
         sys.exit(1)
 
@@ -190,7 +184,9 @@ if __name__ == "__main__":
     print("normalized output_path", output_path)
     
     page_numbers = None
-    if len(sys.argv) == 4:
+    language = "russian"  # default language
+    
+    if len(sys.argv) >= 4:
         # Get total pages for bounds checking
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
@@ -199,4 +195,11 @@ if __name__ == "__main__":
         if not page_numbers:
             print("No valid pages selected.")
             sys.exit(1)
-    process_pdf(pdf_path, output_path, page_numbers=page_numbers)
+    
+    if len(sys.argv) == 5:
+        language = sys.argv[4].lower()
+        if language not in ["russian", "english"]:
+            print("Language must be 'russian' or 'english'")
+            sys.exit(1)
+    
+    process_pdf(pdf_path, output_path, page_numbers=page_numbers, language=language)
